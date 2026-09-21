@@ -1,0 +1,9 @@
+.kiro
+
+# Bibliography PDFs
+bibliografia/
+
+# Build artifacts
+convolve
+run_tests
+*.o
