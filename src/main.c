@@ -7,6 +7,7 @@
  */
 #include "image.h"
 #include "kernel.h"
+#include "matrix.h"
 #include "convolution.h"
 #include "timer.h"
 #include "metrics.h"

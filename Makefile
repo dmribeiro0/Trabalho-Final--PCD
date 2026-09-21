@@ -19,6 +19,7 @@ TEST_BIN = run_tests
 # Library sources (everything except main.c), reused by the binary and tests.
 LIB_SRCS = $(SRC_DIR)/image.c \
            $(SRC_DIR)/kernel.c \
+           $(SRC_DIR)/matrix.c \
            $(SRC_DIR)/convolution.c \
            $(SRC_DIR)/timer.c \
            $(SRC_DIR)/metrics.c
