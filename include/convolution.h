@@ -9,19 +9,6 @@
 #ifndef CONVOLUTION_H
 #define CONVOLUTION_H
 
-typedef struct {
-    int width;
-    int height;
-    float *data;
-} Image;
-
-// 3X3
-typedef struct {
-    int size;
-    float data[9]; 
-} Kernel;
-
 void apply_convolution(Image *input, Kernel *kernel, Image *output);
-void get_convolution_filters(Kernel filters[5]);
 
 #endif /* CONVOLUTION_H */
