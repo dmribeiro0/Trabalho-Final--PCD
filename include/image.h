@@ -8,4 +8,14 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+typedef struct {
+    int width;
+    int height;
+    float *data;
+} Image;
+
+Image load_image(const char *filename);
+void save_image(const char *filename, Image *img);
+void free_image(Image *img);
+
 #endif /* IMAGE_H */
