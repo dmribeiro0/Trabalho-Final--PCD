@@ -60,26 +60,28 @@ void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
 
     output->width = w;
     output->height = h;
-    output->data = (float *)malloc(w * h * sizeof(float));
+    output->data = (float *)malloc(w * h * 3 * sizeof(float)); 
 
     #pragma omp parallel for
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
-            float sum = 0.0f;
+            for (int c = 0; c < 3; c++) { 
+                float sum = 0.0f;
 
-            for (int ky = -k_radius; ky <= k_radius; ky++) {
-                for (int kx = -k_radius; kx <= k_radius; kx++) {
-                    int px = x + kx;
-                    int py = y + ky;
+                for (int ky = -k_radius; ky <= k_radius; ky++) {
+                    for (int kx = -k_radius; kx <= k_radius; kx++) {
+                        int px = x + kx;
+                        int py = y + ky;
 
-                    if (px >= 0 && px < w && py >= 0 && py < h) {
-                        float pixel_val = input->data[py * w + px];
-                        float weight = kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
-                        sum += pixel_val * weight;
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            float pixel_val = input->data[(py * w + px) * 3 + c]; 
+                            float weight = kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
+                            sum += pixel_val * weight;
+                        }
                     }
                 }
+                output->data[(y * w + x) * 3 + c] = sum;
             }
-            output->data[y * w + x] = sum;
         }
     }
 }
@@ -93,19 +95,21 @@ void *pthread_worker(void *args) {
 
     for (int y = targs->start_y; y < targs->end_y; y++) {
         for (int x = 0; x < w; x++) {
-            float sum = 0.0f;
-            for (int ky = -k_radius; ky <= k_radius; ky++) {
-                for (int kx = -k_radius; kx <= k_radius; kx++) {
-                    int px = x + kx;
-                    int py = y + ky;
-                    if (px >= 0 && px < w && py >= 0 && py < h) {
-                        float pixel_val = targs->input->data[py * w + px];
-                        float weight = targs->kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
-                        sum += pixel_val * weight;
+            for (int c = 0; c < 3; c++) { 
+                float sum = 0.0f;
+                for (int ky = -k_radius; ky <= k_radius; ky++) {
+                    for (int kx = -k_radius; kx <= k_radius; kx++) {
+                        int px = x + kx;
+                        int py = y + ky;
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            float pixel_val = targs->input->data[(py * w + px) * 3 + c]; 
+                            float weight = targs->kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
+                            sum += pixel_val * weight;
+                        }
                     }
                 }
+                targs->output->data[(y * w + x) * 3 + c] = sum; 
             }
-            targs->output->data[y * w + x] = sum;
         }
     }
     return NULL;
@@ -117,7 +121,7 @@ void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output) {
 
     output->width = w;
     output->height = h;
-    output->data = (float *)malloc(w * h * sizeof(float));
+    output->data = (float *)malloc(w * h * 3 * sizeof(float));
 
     pthread_t threads[NUM_THREADS];
     ThreadArgs args[NUM_THREADS];
