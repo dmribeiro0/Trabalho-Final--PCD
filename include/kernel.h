@@ -9,4 +9,14 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
+#define KERNEL_SIZE 3
+#define KERNEL_AREA (KERNEL_SIZE * KERNEL_SIZE)
+
+typedef struct {
+    int size;
+    float data[KERNEL_AREA];
+} Kernel;
+
+void get_convolution_filters(Kernel filters[5]);
+
 #endif /* KERNEL_H */
