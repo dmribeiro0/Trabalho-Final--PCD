@@ -76,9 +76,10 @@ int main(int argc, char **argv) {
         apply_convolution_openmp(&img, &filters[filter_idx], &out_img);
     } else if (modo_idx == 2) {
         apply_convolution_pthread(&img, &filters[filter_idx], &out_img);
-    } else if (modo_idx == 3) {
-        apply_convolution_cuda(&img, &filters[filter_idx], &out_img);
-    }
+    } 
+    // else if (modo_idx == 3) {
+    //     apply_convolution_cuda(&img, &filters[filter_idx], &out_img);
+    // }
 
     char out_filename[256];
     sprintf(out_filename, "resultado_%s_f%d.png", modo_nomes[modo_idx], filter_idx);
