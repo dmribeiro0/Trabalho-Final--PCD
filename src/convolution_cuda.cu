@@ -9,19 +9,21 @@ __global__ void convolution_kernel_cuda(float *in_data, float *out_data, float *
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (x < w && y < h) {
-        float sum = 0.0f;
-        for (int ky = -k_radius; ky <= k_radius; ky++) {
-            for (int kx = -k_radius; kx <= k_radius; kx++) {
-                int px = x + kx;
-                int py = y + ky;
-                if (px >= 0 && px < w && py >= 0 && py < h) {
-                    float pixel_val = in_data[py * w + px];
-                    float weight = kernel_data[(ky + k_radius) * k_size + (kx + k_radius)];
-                    sum += pixel_val * weight;
+        for (int c = 0; c < 3; c++) { 
+            float sum = 0.0f;
+            for (int ky = -k_radius; ky <= k_radius; ky++) {
+                for (int kx = -k_radius; kx <= k_radius; kx++) {
+                    int px = x + kx;
+                    int py = y + ky;
+                    if (px >= 0 && px < w && py >= 0 && py < h) {
+                        float pixel_val = in_data[(py * w + px) * 3 + c]; // Índice ajustado
+                        float weight = kernel_data[(ky + k_radius) * k_size + (kx + k_radius)];
+                        sum += pixel_val * weight;
+                    }
                 }
             }
+            out_data[(y * w + x) * 3 + c] = sum; 
         }
-        out_data[y * w + x] = sum;
     }
 }
 
@@ -33,7 +35,7 @@ void apply_convolution_cuda(Image *input, Kernel *kernel, Image *output) {
 
     output->width = w;
     output->height = h;
-    size_t img_size = w * h * sizeof(float);
+    size_t img_size = w * h * 3 * sizeof(float); 
     size_t k_bytes = k_size * k_size * sizeof(float);
     output->data = (float *)malloc(img_size);
 
