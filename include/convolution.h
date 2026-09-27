@@ -9,6 +9,12 @@
 #ifndef CONVOLUTION_H
 #define CONVOLUTION_H
 
-void apply_convolution(Image *input, Kernel *kernel, Image *output);
+#include "image.h"
+#include "kernel.h"
+
+void apply_convolution_sequential(Image *input, Kernel *kernel, Image *output);
+void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output);
+void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output);
+void apply_convolution_cuda(Image *input, Kernel *kernel, Image *output);
 
 #endif /* CONVOLUTION_H */
