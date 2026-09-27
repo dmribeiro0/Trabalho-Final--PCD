@@ -29,10 +29,10 @@ Image load_image(const char *filename) {
 }
 
 void save_image(const char *filename, Image *img) {
-    unsigned char *raw = (unsigned char *)malloc(img.width * img.height);
+    unsigned char *raw = (unsigned char *)malloc(img->width * img->height);
     
-    for (int i = 0; i < img.width * img.height; i++) {
-        float val = img.data[i];
+    for (int i = 0; i < img->width * img->height; i++) {
+        float val = img->data[i];
         if (val < 0.0f) val = 0.0f;
         if (val > 255.0f) val = 255.0f;
         raw[i] = (unsigned char)val;
