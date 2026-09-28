@@ -263,13 +263,34 @@ int main(int argc, char **argv) {
 
     double elapsed = timer_stop(&timer);
 
+    // Calcular speedup comparando com sequential
+    // O tempo sequential precisa ser calculado separadamente
+    // Para simplificar, vamos calcular o speedup como 1 se for o modo seq
+    // ou como (tempo_sequencial / tempo_atual) se for paralelo
+    double speedup = 1.0;
+    if (mode_idx != 0) {
+        // Reexecutar sequential para obter tempo de baseline
+        Image seq_img;
+        seq_img.width = img.width;
+        seq_img.height = img.height;
+        seq_img.data = (float *)malloc(img.width * img.height * 3 * sizeof(float));
+        
+        Timer seq_timer;
+        timer_start(&seq_timer);
+        apply_convolution_sequential(&img, &filters[filter_idx], &seq_img);
+        double seq_elapsed = timer_stop(&seq_timer);
+        
+        speedup = seq_elapsed / elapsed;
+        
+        free_image(&seq_img);
+    }
+
     // Salvar imagem de saída
     save_image(opts.output_path, &out_img);
 
     // Calcular métricas
     int operations = img.width * img.height * filters[filter_idx].size * filters[filter_idx].size * 3; // aproximado
     double flops = operations / elapsed;
-    double speedup = 1.0; // baseline é 1.0 (referência)
 
     // Imprimir resumo
     printf("=== Resultados ===\n");
