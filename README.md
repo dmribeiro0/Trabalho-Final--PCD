@@ -29,8 +29,14 @@ make seq        # build sequential version
 make omp        # build OpenMP version
 make pthread    # build Pthreads version
 make cuda       # build CUDA version (requires nvcc)
+make test-all   # run every mode/kernel combination; requires a CUDA GPU
+make test-all MODES='seq omp pthread' # run CPU combinations without a GPU
 make clean      # remove build artifacts
 ```
+
+`make test-all` saves each image and its `metrics.json` in
+`results/<mode>/<kernel>/`. It stops on the first failed run. CUDA needs
+`nvcc` to build and an available NVIDIA GPU to run.
 
 ## Uso
 

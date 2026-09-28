@@ -153,8 +153,10 @@ void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output) {
 }
 
 /* Stub para CUDA (implementado em src/parallel/convolution_cuda.cu) */
+#ifndef HAVE_CUDA
 void apply_convolution_cuda(Image *input, Kernel *kernel, Image *output) {
     (void)input; (void)kernel; (void)output;
     fprintf(stderr, "Erro: CUDA não implementado ou não disponível\n");
     exit(1);
 }
+#endif
