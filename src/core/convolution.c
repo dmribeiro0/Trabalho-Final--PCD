@@ -1,16 +1,16 @@
 /* convolution.c — convolution module implementation.
  *
- * Implements the interface declared in include/convolution.h: the general and
- * separable convolution routines. This is the compute core to be parallelized
- * in later phases (OpenMP / Pthreads / CUDA).
- *
- * TODO: implement this module.
+ * Implements all convolution variants: sequential, OpenMP, Pthreads.
+ * CUDA implementation is in src/parallel/convolution_cuda.cu.
  */
-#include "../include/convolution.h"
+
+#include "convolution.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <pthread.h>
 
 #define NUM_THREADS 4
+
 typedef struct {
     Image *input;
     Kernel *kernel;
@@ -19,6 +19,7 @@ typedef struct {
     int end_y;
 } ThreadArgs;
 
+/* Sequential implementation */
 void apply_convolution_sequential(Image *input, Kernel *kernel, Image *output) {
     int w = input->width;
     int h = input->height;
@@ -52,6 +53,8 @@ void apply_convolution_sequential(Image *input, Kernel *kernel, Image *output) {
     }
 }
 
+/* OpenMP implementation - compiles only when _OPENMP is defined */
+#ifdef _OPENMP
 void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
     int w = input->width;
     int h = input->height;
@@ -85,7 +88,14 @@ void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
         }
     }
 }
+#else
+/* Stub para OpenMP quando _OPENMP não está definido */
+void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
+    (void)input; (void)kernel; (void)output;
+}
+#endif
 
+/* Pthreads implementation */
 void *pthread_worker(void *args) {
     ThreadArgs *targs = (ThreadArgs *)args;
     int w = targs->input->width;
@@ -141,3 +151,12 @@ void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output) {
         pthread_join(threads[i], NULL);
     }
 }
+
+/* Stub para CUDA (implementado em src/parallel/convolution_cuda.cu) */
+#ifndef HAVE_CUDA
+void apply_convolution_cuda(Image *input, Kernel *kernel, Image *output) {
+    (void)input; (void)kernel; (void)output;
+    fprintf(stderr, "Erro: CUDA não implementado ou não disponível\n");
+    exit(1);
+}
+#endif

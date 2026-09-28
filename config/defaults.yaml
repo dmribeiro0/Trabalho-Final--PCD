@@ -1,0 +1,51 @@
+# Configurações padrão para experimentos com filtros convolucionais
+
+# Tamanho dos blocos para divisão da imagem
+block_sizes:
+  - 16
+  - 32
+  - 64
+  - 128
+
+# Tamanhos dos kernels (ímpares: 3, 5, 7, 9, ...)
+kernel_sizes:
+  - 3
+  - 5
+  - 7
+  - 9
+
+# Kernels disponíveis
+kernels:
+  - name: laplacian
+    description: "Detecção de contornos omnidirecional"
+  - name: sobel_h
+    description: "Detecção de bordas horizontais"
+  - name: sobel_v
+    description: "Detecção de bordas verticais"
+  - name: sharpen
+    description: "Realce de nitidez"
+  - name: blur
+    description: "Desfoque Box (média)"
+
+# Modos de execução
+modes:
+  - seq    # Sequential
+  - omp    # OpenMP
+  - pthread # Pthreads
+  - cuda   # CUDA
+
+# Tamanho padrão
+defaults:
+  block_size: 32
+  kernel_size: 3
+  mode: seq
+  output_dir: results/
+
+# Estratégias de divisão
+strategies:
+  - block      # Blocos contíguos (preserva localidade)
+  - cyclic     # Distribuição cíclica
+  - row        # Divisão por linhas
+
+# Iterações para média
+iterations: 5

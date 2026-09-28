@@ -5,7 +5,7 @@
  *
  * TODO: implement this module.
  */
-#include "../include/kernel.h"
+#include "kernel.h"
 
 void get_convolution_filters(Kernel filters[5]) {
   

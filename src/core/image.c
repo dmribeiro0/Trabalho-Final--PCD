@@ -10,7 +10,7 @@
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-#include "../include/image.h"
+#include "image.h"
 #include <stdlib.h>
 
 Image load_image(const char *filename) {
