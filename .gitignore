@@ -7,3 +7,9 @@ bibliografia/
 convolve
 run_tests
 *.o
+
+
+# Runnable
+bin/*
+!bin/.gitkeep
+*.exe
