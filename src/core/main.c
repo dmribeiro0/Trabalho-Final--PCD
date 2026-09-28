@@ -287,16 +287,23 @@ int main(int argc, char **argv) {
     }
 
     // Salvar imagem de saída
+    // Forçar caminho relativo à pasta results/
+    char final_output_path[1024];
+    if (opts.output_path[0] != '/') {
+        snprintf(final_output_path, sizeof(final_output_path), "results/%s", opts.output_path);
+    } else {
+        strncpy(final_output_path, opts.output_path, sizeof(final_output_path));
+    }
     // Criar diretório de saída se não existir
-    char *last_slash = strrchr(opts.output_path, '/');
+    char *last_slash = strrchr(final_output_path, '/');
     if (last_slash) {
         char dir[512];
-        size_t dir_len = last_slash - opts.output_path;
-        strncpy(dir, opts.output_path, dir_len);
+        size_t dir_len = last_slash - final_output_path;
+        strncpy(dir, final_output_path, dir_len);
         dir[dir_len] = '\0';
         mkdir(dir, 0755);
     }
-    save_image(opts.output_path, &out_img);
+    save_image(final_output_path, &out_img);
 
     // Calcular métricas
     int operations = img.width * img.height * filters[filter_idx].size * filters[filter_idx].size * 3; // aproximado
@@ -311,20 +318,27 @@ int main(int argc, char **argv) {
     printf("Tempo: %.6f s\n", elapsed);
     printf("FLOPS: %.2f\n", flops);
     printf("Speedup: %.2fx\n", speedup);
-    printf("Saída: %s\n", opts.output_path);
+    printf("Saída: %s\n", final_output_path);
 
     // Salvar métricas em JSON se especificado
     if (opts.metrics_path) {
+        // Forçar caminho relativo à pasta results/
+        char final_metrics_path[1024];
+        if (opts.metrics_path[0] != '/') {
+            snprintf(final_metrics_path, sizeof(final_metrics_path), "results/%s", opts.metrics_path);
+        } else {
+            strncpy(final_metrics_path, opts.metrics_path, sizeof(final_metrics_path));
+        }
         // Criar diretório de métricas se não existir
-        char *last_slash = strrchr(opts.metrics_path, '/');
+        char *last_slash = strrchr(final_metrics_path, '/');
         if (last_slash) {
             char dir[512];
-            size_t dir_len = last_slash - opts.metrics_path;
-            strncpy(dir, opts.metrics_path, dir_len);
+            size_t dir_len = last_slash - final_metrics_path;
+            strncpy(dir, final_metrics_path, dir_len);
             dir[dir_len] = '\0';
             mkdir(dir, 0755);
         }
-        FILE *f = fopen(opts.metrics_path, "w");
+        FILE *f = fopen(final_metrics_path, "w");
         if (f) {
             fprintf(f, "{\n");
             fprintf(f, "  \"image\": \"%s\",\n", opts.image_path);
@@ -338,9 +352,9 @@ int main(int argc, char **argv) {
             fprintf(f, "  \"speedup\": %.2f\n", speedup);
             fprintf(f, "}\n");
             fclose(f);
-            printf("Métricas salvas em: %s\n", opts.metrics_path);
+            printf("Métricas salvas em: %s\n", final_metrics_path);
         } else {
-            fprintf(stderr, "Aviso: não foi possível salvar métricas em %s\n", opts.metrics_path);
+            fprintf(stderr, "Aviso: não foi possível salvar métricas em %s\n", final_metrics_path);
         }
     }
 
