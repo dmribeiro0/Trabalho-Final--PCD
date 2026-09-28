@@ -1,0 +1,27 @@
+# Esqueleto exemplo, valores certos a definir ainda ...
+
+services:
+  cuda-env:
+    image: nvidia/cuda:12.2.2-devel-ubuntu22.04
+    container_name: ambiente_pcd
+    working_dir: /app
+    
+    volumes:
+      - .:/app
+      
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+              
+    command: >
+      /bin/bash -c "
+      apt-get update && 
+      apt-get install -y build-essential && 
+      tail -f /dev/null"
