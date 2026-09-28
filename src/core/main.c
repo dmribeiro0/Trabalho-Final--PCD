@@ -324,7 +324,7 @@ int main(int argc, char **argv) {
     if (opts.metrics_path) {
         // Forçar caminho relativo à pasta results/
         char final_metrics_path[1024];
-        if (opts.metrics_path[0] != '/') {
+        if (strncmp(opts.metrics_path, "results/", 8) != 0 && strncmp(opts.metrics_path, "tests/", 6) != 0) {
             snprintf(final_metrics_path, sizeof(final_metrics_path), "results/%s", opts.metrics_path);
         } else {
             strncpy(final_metrics_path, opts.metrics_path, sizeof(final_metrics_path));
