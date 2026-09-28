@@ -3,9 +3,9 @@
   "image_dims": [554, 554],
   "kernel": "blur",
   "kernel_size": 3,
-  "mode": "pthread",
+  "mode": "omp",
   "block_size": 32,
-  "time_seconds": 0.002410,
-  "flops": 3438429499.33,
-  "speedup": 3.39
+  "time_seconds": 0.006300,
+  "flops": 1315387483.59,
+  "speedup": 1.66
 }
