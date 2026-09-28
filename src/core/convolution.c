@@ -1,0 +1,160 @@
+/* convolution.c — convolution module implementation.
+ *
+ * Implements all convolution variants: sequential, OpenMP, Pthreads.
+ * CUDA implementation is in src/parallel/convolution_cuda.cu.
+ */
+
+#include "convolution.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <pthread.h>
+
+#define NUM_THREADS 4
+
+typedef struct {
+    Image *input;
+    Kernel *kernel;
+    Image *output;
+    int start_y;
+    int end_y;
+} ThreadArgs;
+
+/* Sequential implementation */
+void apply_convolution_sequential(Image *input, Kernel *kernel, Image *output) {
+    int w = input->width;
+    int h = input->height;
+    int k_size = kernel->size;
+    int k_radius = k_size / 2;
+
+    output->width = w;
+    output->height = h;
+    output->data = (float *)malloc(w * h * 3 * sizeof(float)); 
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            for (int c = 0; c < 3; c++) {
+                float sum = 0.0f;
+
+                for (int ky = -k_radius; ky <= k_radius; ky++) {
+                    for (int kx = -k_radius; kx <= k_radius; kx++) {
+                        int px = x + kx;
+                        int py = y + ky;
+
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            float pixel_val = input->data[(py * w + px) * 3 + c];
+                            float weight = kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
+                            sum += pixel_val * weight;
+                        }
+                    }
+                }
+                output->data[(y * w + x) * 3 + c] = sum;
+            }
+        }
+    }
+}
+
+/* OpenMP implementation - compiles only when _OPENMP is defined */
+#ifdef _OPENMP
+void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
+    int w = input->width;
+    int h = input->height;
+    int k_size = kernel->size;
+    int k_radius = k_size / 2;
+
+    output->width = w;
+    output->height = h;
+    output->data = (float *)malloc(w * h * 3 * sizeof(float)); 
+
+    #pragma omp parallel for
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            for (int c = 0; c < 3; c++) { 
+                float sum = 0.0f;
+
+                for (int ky = -k_radius; ky <= k_radius; ky++) {
+                    for (int kx = -k_radius; kx <= k_radius; kx++) {
+                        int px = x + kx;
+                        int py = y + ky;
+
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            float pixel_val = input->data[(py * w + px) * 3 + c]; 
+                            float weight = kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
+                            sum += pixel_val * weight;
+                        }
+                    }
+                }
+                output->data[(y * w + x) * 3 + c] = sum;
+            }
+        }
+    }
+}
+#else
+/* Stub para OpenMP quando _OPENMP não está definido */
+void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
+    (void)input; (void)kernel; (void)output;
+}
+#endif
+
+/* Pthreads implementation */
+void *pthread_worker(void *args) {
+    ThreadArgs *targs = (ThreadArgs *)args;
+    int w = targs->input->width;
+    int h = targs->input->height;
+    int k_size = targs->kernel->size;
+    int k_radius = k_size / 2;
+
+    for (int y = targs->start_y; y < targs->end_y; y++) {
+        for (int x = 0; x < w; x++) {
+            for (int c = 0; c < 3; c++) { 
+                float sum = 0.0f;
+                for (int ky = -k_radius; ky <= k_radius; ky++) {
+                    for (int kx = -k_radius; kx <= k_radius; kx++) {
+                        int px = x + kx;
+                        int py = y + ky;
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            float pixel_val = targs->input->data[(py * w + px) * 3 + c]; 
+                            float weight = targs->kernel->data[(ky + k_radius) * k_size + (kx + k_radius)];
+                            sum += pixel_val * weight;
+                        }
+                    }
+                }
+                targs->output->data[(y * w + x) * 3 + c] = sum; 
+            }
+        }
+    }
+    return NULL;
+}
+
+void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output) {
+    int w = input->width;
+    int h = input->height;
+
+    output->width = w;
+    output->height = h;
+    output->data = (float *)malloc(w * h * 3 * sizeof(float));
+
+    pthread_t threads[NUM_THREADS];
+    ThreadArgs args[NUM_THREADS];
+
+    int chunk_size = h / NUM_THREADS;
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        args[i].input = input;
+        args[i].kernel = kernel;
+        args[i].output = output;
+        args[i].start_y = i * chunk_size;
+        args[i].end_y = (i == NUM_THREADS - 1) ? h : (i + 1) * chunk_size;
+        pthread_create(&threads[i], NULL, pthread_worker, &args[i]);
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
+
+/* Stub para CUDA (implementado em src/parallel/convolution_cuda.cu) */
+void apply_convolution_cuda(Image *input, Kernel *kernel, Image *output) {
+    (void)input; (void)kernel; (void)output;
+    fprintf(stderr, "Erro: CUDA não implementado ou não disponível\n");
+    exit(1);
+}
