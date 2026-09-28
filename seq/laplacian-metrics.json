@@ -1,0 +1,11 @@
+{
+  "image": "images/a.jpg",
+  "image_dims": [554, 554],
+  "kernel": "laplacian",
+  "kernel_size": 3,
+  "mode": "seq",
+  "block_size": 32,
+  "time_seconds": 0.007770,
+  "flops": 1066474651.26,
+  "speedup": 1.00
+}

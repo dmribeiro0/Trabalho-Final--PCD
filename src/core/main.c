@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <sys/stat.h>
 
 // Estrutura para armazenar as opções de execução
 typedef struct {
@@ -286,6 +287,15 @@ int main(int argc, char **argv) {
     }
 
     // Salvar imagem de saída
+    // Criar diretório de saída se não existir
+    char *last_slash = strrchr(opts.output_path, '/');
+    if (last_slash) {
+        char dir[512];
+        size_t dir_len = last_slash - opts.output_path;
+        strncpy(dir, opts.output_path, dir_len);
+        dir[dir_len] = '\0';
+        mkdir(dir, 0755);
+    }
     save_image(opts.output_path, &out_img);
 
     // Calcular métricas
@@ -305,6 +315,15 @@ int main(int argc, char **argv) {
 
     // Salvar métricas em JSON se especificado
     if (opts.metrics_path) {
+        // Criar diretório de métricas se não existir
+        char *last_slash = strrchr(opts.metrics_path, '/');
+        if (last_slash) {
+            char dir[512];
+            size_t dir_len = last_slash - opts.metrics_path;
+            strncpy(dir, opts.metrics_path, dir_len);
+            dir[dir_len] = '\0';
+            mkdir(dir, 0755);
+        }
         FILE *f = fopen(opts.metrics_path, "w");
         if (f) {
             fprintf(f, "{\n");
