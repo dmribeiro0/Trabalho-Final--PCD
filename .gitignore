@@ -10,5 +10,6 @@ run_tests
 
 
 # Runnable
-bin/
+bin/*
+!bin/.gitkeep
 *.exe
