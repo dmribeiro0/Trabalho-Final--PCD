@@ -22,6 +22,11 @@ void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output);
 void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output);
 void apply_convolution_cuda(Image *input, Kernel *kernel, Image *output);
 
+/* Número de threads usado pelos backends OpenMP e Pthreads. Padrão: 4.
+ * O valor é fixado (clamp) a um mínimo de 1. Não afeta seq nem CUDA. */
+void convolution_set_num_threads(int n);
+int convolution_get_num_threads(void);
+
 #ifdef __cplusplus
 }
 #endif

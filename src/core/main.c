@@ -26,6 +26,7 @@
 #include "convolution.h"
 #include "timer.h"
 #include "metrics.h"
+#include "energy.h"
 #include "matrix.h"
 
 #include <stdio.h>
@@ -41,6 +42,7 @@ typedef struct {
     const char *mode;
     int block_size;
     int kernel_size;
+    int threads;
     const char *output_path;
     const char *metrics_path;
 } Options;
@@ -48,6 +50,7 @@ typedef struct {
 // Valores padrão
 #define DEFAULT_BLOCK_SIZE 32
 #define DEFAULT_KERNEL_SIZE 3
+#define DEFAULT_THREADS 4
 #define DEFAULT_MODE "seq"
 #define DEFAULT_OUTPUT "results/resultado.png"
 #define DEFAULT_METRICS "results/metrics.json"
@@ -78,6 +81,7 @@ static void print_usage(const char *prog_name) {
     printf("  -s, --size       Tamanho do kernel (3, 5, 7, 9, ...) (padrão: %d)\n", DEFAULT_KERNEL_SIZE);
     printf("  -o, --output     Caminho do arquivo de saída (padrão: %s)\n", DEFAULT_OUTPUT);
     printf("  -t, --metrics    Caminho do arquivo JSON para métricas (opcional)\n");
+    printf("  -p, --threads    Número de threads (omp/pthread; padrão: %d)\n", DEFAULT_THREADS);
     printf("  -h, --help       Exibir esta ajuda\n");
     printf("\nExemplos:\n");
     printf("  %s -i images/a.jpg -k laplacian -m seq -o result.png\n", prog_name);
@@ -111,6 +115,7 @@ static int parse_args(int argc, char **argv, Options *opts) {
         {"size",     required_argument, 0, 's'},
         {"output",   required_argument, 0, 'o'},
         {"metrics",  required_argument, 0, 't'},
+        {"threads",  required_argument, 0, 'p'},
         {"help",     no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
@@ -121,13 +126,14 @@ static int parse_args(int argc, char **argv, Options *opts) {
     opts->mode = DEFAULT_MODE;
     opts->block_size = DEFAULT_BLOCK_SIZE;
     opts->kernel_size = DEFAULT_KERNEL_SIZE;
+    opts->threads = DEFAULT_THREADS;
     opts->output_path = DEFAULT_OUTPUT;
     opts->metrics_path = DEFAULT_METRICS;
 
     int opt;
     int long_index = 0;
 
-    while ((opt = getopt_long(argc, argv, "i:k:m:b:s:o:t:h", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "i:k:m:b:s:o:t:p:h", long_options, &long_index)) != -1) {
         switch (opt) {
             case 'i':
                 opts->image_path = optarg;
@@ -157,6 +163,13 @@ static int parse_args(int argc, char **argv, Options *opts) {
                 break;
             case 't':
                 opts->metrics_path = optarg;
+                break;
+            case 'p':
+                opts->threads = atoi(optarg);
+                if (opts->threads < 1) {
+                    fprintf(stderr, "Erro: número de threads deve ser >= 1\n");
+                    return -1;
+                }
                 break;
             case 'h':
                 print_usage(argv[0]);
@@ -231,19 +244,23 @@ int main(int argc, char **argv) {
         filters[i].size = opts.kernel_size;
     }
 
-    // Preparar imagem de saída
+    // Preparar imagem de saída (a convolução aloca out_img.data internamente).
     Image out_img;
     out_img.width = img.width;
     out_img.height = img.height;
-    out_img.data = (float *)malloc(img.width * img.height * 3 * sizeof(float));
-    if (!out_img.data) {
-        fprintf(stderr, "Erro: falha ao alocar memória para imagem de saída\n");
-        free_image(&img);
-        return 1;
-    }
+    out_img.data = NULL;
+
+    // Configura o número de threads (afeta omp/pthread).
+    convolution_set_num_threads(opts.threads);
+
+    // P = número de threads: seq usa 1, omp/pthread usam -p; CUDA não usa P.
+    int p_value = (mode_idx == 0) ? 1 : opts.threads;
 
     // Timer
     Timer timer;
+
+    // Amostra de energia (RAPL) antes da região cronometrada.
+    EnergySample e_begin = energy_read();
     timer_start(&timer);
 
     // Executar convolution baseada no modo
@@ -263,27 +280,40 @@ int main(int argc, char **argv) {
     }
 
     double elapsed = timer_stop(&timer);
+    EnergySample e_end = energy_read();
 
-    // Calcular speedup comparando com sequential
-    // O tempo sequential precisa ser calculado separadamente
-    // Para simplificar, vamos calcular o speedup como 1 se for o modo seq
-    // ou como (tempo_sequencial / tempo_atual) se for paralelo
-    double speedup = 1.0;
-    if (mode_idx != 0) {
-        // Reexecutar sequential para obter tempo de baseline
+    // Energia consumida na região cronometrada (J) ou METRIC_NA.
+    double energy_j = energy_delta_joules(&e_begin, &e_end);
+    if (energy_j < 0.0) {
+        energy_j = METRIC_NA;
+    }
+
+    // Speedup(P) = T_s / T_p. Para o modo seq, T_s == T_p => speedup 1.
+    // Para os modos paralelos, reexecuta o sequencial como baseline T_s.
+    double speedup = METRIC_NA;
+    if (mode_idx == 0) {
+        speedup = 1.0;
+    } else {
         Image seq_img;
         seq_img.width = img.width;
         seq_img.height = img.height;
-        seq_img.data = (float *)malloc(img.width * img.height * 3 * sizeof(float));
-        
+        seq_img.data = NULL;
+
         Timer seq_timer;
         timer_start(&seq_timer);
         apply_convolution_sequential(&img, &filters[filter_idx], &seq_img);
         double seq_elapsed = timer_stop(&seq_timer);
-        
-        speedup = seq_elapsed / elapsed;
-        
+
+        speedup = metrics_speedup(seq_elapsed, elapsed);
         free_image(&seq_img);
+    }
+
+    // Eficiência = speedup / P. Não definida para CUDA (P não corresponde a threads de CPU).
+    double efficiency;
+    if (mode_idx == 3) {
+        efficiency = METRIC_NA;
+    } else {
+        efficiency = metrics_efficiency(speedup, p_value);
     }
 
     // Salvar imagem de saída
@@ -305,19 +335,29 @@ int main(int argc, char **argv) {
     }
     save_image(final_output_path, &out_img);
 
-    // Calcular métricas
-    int operations = img.width * img.height * filters[filter_idx].size * filters[filter_idx].size * 3; // aproximado
-    double flops = operations / elapsed;
+    // Calcular métricas usando o módulo de métricas.
+    double flops = metrics_flops(img.width, img.height, 3, opts.kernel_size, elapsed);
+    double mflops = metrics_mflops(flops);
+    double avg_power = metrics_avg_power(energy_j, elapsed);
+    double mflops_per_watt = metrics_mflops_per_watt(mflops, avg_power);
 
     // Imprimir resumo
     printf("=== Resultados ===\n");
     printf("Imagem: %s (%dx%d)\n", opts.image_path, img.width, img.height);
     printf("Kernel: %s (size=%d)\n", opts.kernel_name, opts.kernel_size);
     printf("Modo: %s\n", opts.mode);
+    printf("Threads (P): %d\n", p_value);
     printf("Block size: %d\n", opts.block_size);
     printf("Tempo: %.6f s\n", elapsed);
-    printf("FLOPS: %.2f\n", flops);
-    printf("Speedup: %.2fx\n", speedup);
+    printf("FLOPS: %.2f (%.2f MFLOPS)\n", flops, mflops);
+    if (metric_is_na(speedup)) printf("Speedup: N/A\n");
+    else printf("Speedup: %.2fx\n", speedup);
+    if (metric_is_na(efficiency)) printf("Eficiência: N/A\n");
+    else printf("Eficiência: %.2f\n", efficiency);
+    if (metric_is_na(energy_j)) printf("Energia (RAPL): N/A\n");
+    else printf("Energia: %.4f J (%.2f W)\n", energy_j, avg_power);
+    if (metric_is_na(mflops_per_watt)) printf("MFLOPS/Watt: N/A\n");
+    else printf("MFLOPS/Watt: %.4f\n", mflops_per_watt);
     printf("Saída: %s\n", final_output_path);
 
     // Salvar métricas em JSON se especificado
@@ -346,10 +386,22 @@ int main(int argc, char **argv) {
             fprintf(f, "  \"kernel\": \"%s\",\n", opts.kernel_name);
             fprintf(f, "  \"kernel_size\": %d,\n", opts.kernel_size);
             fprintf(f, "  \"mode\": \"%s\",\n", opts.mode);
+            fprintf(f, "  \"threads_p\": %d,\n", p_value);
             fprintf(f, "  \"block_size\": %d,\n", opts.block_size);
             fprintf(f, "  \"time_seconds\": %.6f,\n", elapsed);
             fprintf(f, "  \"flops\": %.2f,\n", flops);
-            fprintf(f, "  \"speedup\": %.2f\n", speedup);
+            fprintf(f, "  \"mflops\": %.4f,\n", mflops);
+            /* Campos que podem ser N/A são escritos como null em JSON. */
+            if (metric_is_na(speedup)) fprintf(f, "  \"speedup\": null,\n");
+            else fprintf(f, "  \"speedup\": %.4f,\n", speedup);
+            if (metric_is_na(efficiency)) fprintf(f, "  \"efficiency\": null,\n");
+            else fprintf(f, "  \"efficiency\": %.4f,\n", efficiency);
+            if (metric_is_na(energy_j)) fprintf(f, "  \"energy_joules\": null,\n");
+            else fprintf(f, "  \"energy_joules\": %.6f,\n", energy_j);
+            if (metric_is_na(avg_power)) fprintf(f, "  \"avg_power_w\": null,\n");
+            else fprintf(f, "  \"avg_power_w\": %.4f,\n", avg_power);
+            if (metric_is_na(mflops_per_watt)) fprintf(f, "  \"mflops_per_watt\": null\n");
+            else fprintf(f, "  \"mflops_per_watt\": %.6f\n", mflops_per_watt);
             fprintf(f, "}\n");
             fclose(f);
             printf("Métricas salvas em: %s\n", final_metrics_path);
