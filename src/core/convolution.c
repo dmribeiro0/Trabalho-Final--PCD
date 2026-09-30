@@ -9,7 +9,16 @@
 #include <stdio.h>
 #include <pthread.h>
 
-#define NUM_THREADS 4
+/* Número de threads usado por OpenMP e Pthreads (configurável em runtime). */
+static int g_num_threads = 4;
+
+void convolution_set_num_threads(int n) {
+    g_num_threads = (n >= 1) ? n : 1;
+}
+
+int convolution_get_num_threads(void) {
+    return g_num_threads;
+}
 
 typedef struct {
     Image *input;
@@ -65,7 +74,7 @@ void apply_convolution_openmp(Image *input, Kernel *kernel, Image *output) {
     output->height = h;
     output->data = (float *)malloc(w * h * 3 * sizeof(float)); 
 
-    #pragma omp parallel for
+    #pragma omp parallel for num_threads(g_num_threads)
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             for (int c = 0; c < 3; c++) { 
@@ -133,23 +142,35 @@ void apply_convolution_pthread(Image *input, Kernel *kernel, Image *output) {
     output->height = h;
     output->data = (float *)malloc(w * h * 3 * sizeof(float));
 
-    pthread_t threads[NUM_THREADS];
-    ThreadArgs args[NUM_THREADS];
+    int nt = g_num_threads;
+    if (nt < 1) nt = 1;
 
-    int chunk_size = h / NUM_THREADS;
+    pthread_t *threads = (pthread_t *)malloc(nt * sizeof(*threads));
+    ThreadArgs *args = (ThreadArgs *)malloc(nt * sizeof(*args));
+    if (!threads || !args) {
+        fprintf(stderr, "Erro: falha ao alocar estruturas de threads\n");
+        free(threads);
+        free(args);
+        return;
+    }
 
-    for (int i = 0; i < NUM_THREADS; i++) {
+    int chunk_size = h / nt;
+
+    for (int i = 0; i < nt; i++) {
         args[i].input = input;
         args[i].kernel = kernel;
         args[i].output = output;
         args[i].start_y = i * chunk_size;
-        args[i].end_y = (i == NUM_THREADS - 1) ? h : (i + 1) * chunk_size;
+        args[i].end_y = (i == nt - 1) ? h : (i + 1) * chunk_size;
         pthread_create(&threads[i], NULL, pthread_worker, &args[i]);
     }
 
-    for (int i = 0; i < NUM_THREADS; i++) {
+    for (int i = 0; i < nt; i++) {
         pthread_join(threads[i], NULL);
     }
+
+    free(threads);
+    free(args);
 }
 
 /* Stub para CUDA (implementado em src/parallel/convolution_cuda.cu) */

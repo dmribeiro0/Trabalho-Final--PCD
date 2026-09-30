@@ -4,28 +4,28 @@
  * provide raw elapsed time. Derived performance metrics (FLOPS, throughput,
  * speedup) are built on top of this in the metrics module (see metrics.h).
  *
- * Usando clock_gettime(CLOCK_MONOTONIC) para alta resolução e imunidade a
- * ajustes do sistema.
+ * Usa gettimeofday() para medir o tempo de parede (wall-clock). A resolução
+ * é de microssegundos, suficiente para a granularidade dos experimentos.
  */
 #ifndef TIMER_H
 #define TIMER_H
 
-#include <time.h>
+#include <sys/time.h>
 
-/* Timer结构 - armazena o tempo inicial e final em struct timespec */
+/* Timer — armazena o instante inicial e final em struct timeval */
 typedef struct {
-    struct timespec start;
-    struct timespec end;
+    struct timeval start;
+    struct timeval end;
     double elapsed;  /* tempo decorrido em segundos */
 } Timer;
 
 /* Inicia o timer */
 void timer_start(Timer *t);
 
-/* Para o timer e calcula o tempo decorrido */
+/* Para o timer e calcula o tempo decorrido (em segundos) */
 double timer_stop(Timer *t);
 
-/* Retorna o tempo decorrido sem parar (read-only) */
+/* Retorna o tempo decorrido sem parar (read-only, em segundos) */
 double timer_elapsed(Timer *t);
 
 /* Zera o timer */

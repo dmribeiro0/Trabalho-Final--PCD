@@ -49,6 +49,17 @@ extern "C" void apply_convolution_cuda(Image *input, Kernel *kernel, Image *outp
 
     size_t image_bytes = (size_t)input->width * input->height * 3 * sizeof(float);
     size_t kernel_bytes = (size_t)kernel->size * kernel->size * sizeof(float);
+
+    /* Aloca a saída internamente (mesmo contrato dos backends seq/omp/pthread:
+     * cada apply_convolution_* aloca output->data). */
+    output->width = input->width;
+    output->height = input->height;
+    output->data = (float *)malloc(image_bytes);
+    if (!output->data) {
+        fprintf(stderr, "CUDA: falha ao alocar imagem de saida no host\n");
+        exit(EXIT_FAILURE);
+    }
+
     float *device_input, *device_weights, *device_output;
     check_cuda(cudaMalloc((void **)&device_input, image_bytes), "alocando entrada");
     check_cuda(cudaMalloc((void **)&device_weights, kernel_bytes), "alocando filtro");
