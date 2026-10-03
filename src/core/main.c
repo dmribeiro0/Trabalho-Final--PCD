@@ -8,202 +8,103 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <getopt.h>
 #include <sys/stat.h>
-
-// Estrutura para armazenar as opções de execução
-typedef struct {
-    const char *image_path;
-    const char *kernel_name;
-    const char *mode;
-    int block_size;
-    int kernel_size;
-    int threads;
-    const char *output_path;
-    const char *metrics_path;
-} Options;
-
-// Valores padrão
-#define DEFAULT_BLOCK_SIZE 32
-#define DEFAULT_KERNEL_SIZE 3
-#define DEFAULT_THREADS 4
-#define DEFAULT_MODE "seq"
-#define DEFAULT_OUTPUT "results/resultado.png"
-#define DEFAULT_METRICS "results/metrics.json"
-
-// Protótipos das funções auxiliares
-static void print_usage(const char *prog_name);
-static int parse_args(int argc, char **argv, Options *opts);
-static int get_kernel_index(const char *name);
-static int get_mode_index(const char *name);
 
 // Mapa de kernels
 static const char *kernel_names[] = {
     "laplacian", "sobel_h", "sobel_v", "sharpen", "blur"
 };
 
-// Mapa de modos
-static const char *mode_names[] = {
-    "seq", "omp", "pthread", "cuda"
-};
+int main(void) {
+    const char *image_path = "images/a.jpg";
+    const char *mode = "seq";
+    const int kernel_size = 3;
+    const int threads = 4;
+    const int num_runs = 10;
+    const int mode_index = 0;
 
-static void print_usage(const char *prog_name) {
-    printf("Uso: %s -i <imagem> -k <kernel> [opções]\n", prog_name);
-    printf("\nOpções:\n");
-    printf("  -i, --image      Caminho da imagem de entrada (obrigatório)\n");
-    printf("  -k, --kernel     Nome do kernel: laplacian, sobel_h, sobel_v, sharpen, blur (obrigatório)\n");
-    printf("  -m, --mode       Modo de execução: seq, omp, pthread, cuda (padrão: seq)\n");
-    printf("  -b, --block      Tamanho do bloco para divisão da imagem (padrão: %d)\n", DEFAULT_BLOCK_SIZE);
-    printf("  -s, --size       Tamanho do kernel (3, 5, 7, 9, ...) (padrão: %d)\n", DEFAULT_KERNEL_SIZE);
-    printf("  -o, --output     Caminho do arquivo de saída (padrão: %s)\n", DEFAULT_OUTPUT);
-    printf("  -t, --metrics    Caminho do arquivo JSON para métricas (opcional)\n");
-    printf("  -p, --threads    Número de threads (omp/pthread; padrão: %d)\n", DEFAULT_THREADS);
-    printf("  -h, --help       Exibir esta ajuda\n");
-    printf("\nExemplos:\n");
-    printf("  %s -i images/a.jpg -k laplacian -m seq -o result.png\n", prog_name);
-    printf("  %s -i images/a.jpg -k blur -m omp -b 64 -s 5 -o blur_omp.png\n", prog_name);
-}
-
-static int get_kernel_index(const char *name) {
-    for (int i = 0; i < 5; i++) {
-        if (strcmp(name, kernel_names[i]) == 0) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-static int get_mode_index(const char *name) {
-    for (int i = 0; i < 4; i++) {
-        if (strcmp(name, mode_names[i]) == 0) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-int main(int argc, char **argv) {
-    Options opts;
-
-#define NUM_KERNELS 5
-#define NUM_MODES 4
-#define NUM_RUNS 10
-
-    // Set default values for options
-    opts.image_path = '../../images/a.jpg';
-    opts.kernel_name = NULL;
-    opts.mode = DEFAULT_MODE;
-    opts.block_size = DEFAULT_BLOCK_SIZE;
-    opts.kernel_size = DEFAULT_KERNEL_SIZE;
-    opts.threads = DEFAULT_THREADS;
-    opts.output_path = DEFAULT_OUTPUT;
-    opts.metrics_path = DEFAULT_METRICS;
-
-    Image img = load_image(opts.image_path);
+    Image img = load_image(image_path);
     if (!img.data) {
-        fprintf(stderr, "Erro ao carregar a imagem: %s\n", opts.image_path);
+        fprintf(stderr, "Erro ao carregar a imagem: %s\n", image_path);
         return 1;
     }
 
     Kernel filters[5];
     get_convolution_filters(filters);
-
     for (int i = 0; i < 5; i++) {
-        filters[i].size = opts.kernel_size;
+        filters[i].size = kernel_size;
     }
 
-    Image out_img;
-    out_img.width = img.width;
-    out_img.height = img.height;
-    out_img.data = NULL;
+    convolution_set_num_threads(threads);
+    mkdir("outputs", 0755);
 
-    convolution_set_num_threads(opts.threads);
-
-    double times[NUM_KERNELS][NUM_MODES] = {{0.0}};
-    double energy_totals[NUM_KERNELS][NUM_MODES] = {{0.0}};
-    int energy_counts[NUM_KERNELS][NUM_MODES] = {{0}};
-
-    // Start processing the image with all kernels and modes
-    for (int kernel_index = 0; kernel_index < NUM_KERNELS; kernel_index++) {
-        opts.kernel_name = kernel_names[kernel_index];
-        for (int run_index = 0; run_index < NUM_RUNS; run_index++) {
-            for (int mode_index = 0; mode_index < NUM_MODES; mode_index++) {
-                opts.mode = mode_names[mode_index];
-
-                // Prepare output path
-                char output_path[1024];
-                snprintf(output_path, sizeof(output_path), "results/%s_%s_run%d.png", opts.kernel_name, opts.mode, run_index + 1);
-                opts.output_path = output_path;
-                out_img.data = NULL;
-
-                EnergySample energy_begin = energy_read();
-                Timer timer;
-                timer_start(&timer);
-
-                switch (mode_index) {
-                case 0: // Sequential
-                    apply_convolution_sequential(&img, &filters[kernel_index], &out_img);
-                    break;
-                case 1: // OpenMP
-                    apply_convolution_openmp(&img, &filters[kernel_index], &out_img);
-                    break;
-                case 2: // Pthreads
-                    apply_convolution_pthread(&img, &filters[kernel_index], &out_img);
-                    break;
-                case 3: // CUDA
-                    apply_convolution_cuda(&img, &filters[kernel_index], &out_img);
-                    break;
-                    break;
-                }
-                
-                double elapsed_time = timer_stop(&timer);
-                EnergySample energy_end = energy_read();
-                double energy_joules = energy_delta_joules(&energy_begin, &energy_end);
-
-                times[kernel_index][mode_index] += elapsed_time;
-                if (energy_joules >= 0.0) {
-                    energy_totals[kernel_index][mode_index] += energy_joules;
-                    energy_counts[kernel_index][mode_index]++;
-                }
-
-                save_image(opts.output_path, &out_img);
-                free_image(&out_img);
-            }
-        }
-    }
-
-    printf("=== Resultados médios (%d execuções) ===\n", NUM_RUNS);
-    for (int kernel_index = 0; kernel_index < NUM_KERNELS; kernel_index++) {
-        double sequential_average = times[kernel_index][0] / NUM_RUNS;
+    printf("=== Experimento: %d execucoes por kernel (%s) ===\n", num_runs, mode);
+    for (int kernel_index = 0; kernel_index < 5; kernel_index++) {
+        double total_time = 0.0;
+        double total_energy = 0.0;
+        int energy_count = 0;
 
         printf("\nKernel: %s\n", kernel_names[kernel_index]);
-        for (int mode_index = 0; mode_index < NUM_MODES; mode_index++) {
-            double average_time = times[kernel_index][mode_index] / NUM_RUNS;
-            double average_energy = METRIC_NA;
-            if (energy_counts[kernel_index][mode_index] > 0) {
-                average_energy = energy_totals[kernel_index][mode_index] /
-                                 energy_counts[kernel_index][mode_index];
+        for (int run_index = 0; run_index < num_runs; run_index++) {
+            Image out_img = {img.width, img.height, NULL};
+            EnergySample energy_begin = energy_read();
+            Timer timer;
+            timer_start(&timer);
+
+            switch (mode_index) {
+            case 0:
+                apply_convolution_sequential(&img, &filters[kernel_index], &out_img);
+                break;
+            case 1:
+                apply_convolution_openmp(&img, &filters[kernel_index], &out_img);
+                break;
+            case 2:
+                apply_convolution_pthread(&img, &filters[kernel_index], &out_img);
+                break;
+            case 3:
+                apply_convolution_cuda(&img, &filters[kernel_index], &out_img);
+                break;
             }
 
-            double speedup = metrics_speedup(sequential_average, average_time);
-            if (mode_index == 0) {
-                speedup = 1.0;
-            }
+            double elapsed = timer_stop(&timer);
+            EnergySample energy_end = energy_read();
+            double energy = energy_delta_joules(&energy_begin, &energy_end);
+            double speedup = 1.0;
+            double efficiency = metrics_efficiency(speedup, 1);
+            double flops = metrics_flops(img.width, img.height, 3, kernel_size, elapsed);
+            double mflops = metrics_mflops(flops);
+            double avg_power = metrics_avg_power(energy, elapsed);
+            double mflops_per_watt = metrics_mflops_per_watt(mflops, avg_power);
 
-            printf("  %-7s | tempo médio: %.6f s | speedup: ",
-                   mode_names[mode_index], average_time);
-            if (metric_is_na(speedup)) {
-                printf("N/A");
-            } else {
-                printf("%.2fx", speedup);
+            char output_path[256];
+            snprintf(output_path, sizeof(output_path),
+                     "outputs/%s_%s_run%d.png", kernel_names[kernel_index], mode, run_index + 1);
+            save_image(output_path, &out_img);
+
+            total_time += elapsed;
+            if (!metric_is_na(energy)) {
+                total_energy += energy;
+                energy_count++;
             }
-            printf(" | energia média: ");
-            if (metric_is_na(average_energy)) {
-                printf("N/A\n");
-            } else {
-                printf("%.6f J\n", average_energy);
-            }
+                 printf("  execucao %d: %.6f s | %.2f FLOPS | %.2f MFLOPS | ",
+                     run_index + 1, elapsed, flops, mflops);
+                 if (metric_is_na(energy)) printf("energia: N/A | ");
+                 else printf("energia: %.6f J | ", energy);
+                 if (metric_is_na(avg_power)) printf("potencia: N/A | ");
+                 else printf("potencia: %.6f W | ", avg_power);
+                 if (metric_is_na(mflops_per_watt)) printf("MFLOPS/W: N/A | ");
+                 else printf("MFLOPS/W: %.6f | ", mflops_per_watt);
+                 printf("speedup: %.2fx | eficiencia: %.2f | imagem: %s\n",
+                     speedup, efficiency, output_path);
+            free_image(&out_img);
+        }
+
+        printf("  media: %.6f s | speedup: 1.00x | eficiencia: 1.00\n",
+               total_time / num_runs);
+        if (energy_count > 0) {
+            printf("  energia media: %.6f J\n", total_energy / energy_count);
+        } else {
+            printf("  energia media: N/A\n");
         }
     }
 
