@@ -15,6 +15,53 @@ static const char *kernel_names[] = {
     "laplacian", "sobel_h", "sobel_v", "sharpen", "blur"
 };
 
+typedef struct {
+    double time_elapsed;
+    double energy_consumed;
+    double speedup;
+    double efficiency;
+    double flops;
+    double mflops;
+    double avg_power;
+    double mflops_per_watt;
+} RunStats;
+
+typedef struct {
+    RunStats runs[10];
+    double avg_time;
+    double avg_energy;
+    double avg_speedup;
+    double avg_efficiency;
+    double avg_flops;
+    double avg_mflops;
+    double avg_power;
+    double avg_mflops_per_watt;
+} KernelStats;
+
+KernelStats create_kernel_stats() {
+    KernelStats stats;
+    for (int i = 0; i < 10; i++) {
+        stats.runs[i].time_elapsed = 0.0;
+        stats.runs[i].energy_consumed = 0.0;
+        stats.runs[i].speedup = 0.0;
+        stats.runs[i].efficiency = 0.0;
+        stats.runs[i].flops = 0.0;
+        stats.runs[i].mflops = 0.0;
+        stats.runs[i].avg_power = 0.0;
+        stats.runs[i].mflops_per_watt = 0.0;
+    }
+    stats.avg_time = 0.0;
+    stats.avg_energy = 0.0;
+    stats.avg_speedup = 0.0;
+    stats.avg_efficiency = 0.0;
+    stats.avg_flops = 0.0;
+    stats.avg_mflops = 0.0;
+    stats.avg_power = 0.0;
+    stats.avg_mflops_per_watt = 0.0;
+
+    return stats;
+}
+
 int main(void) {
     const char *image_path = "images/a.jpg";
     const char *mode = "seq";
@@ -37,6 +84,8 @@ int main(void) {
 
     convolution_set_num_threads(threads);
     mkdir("outputs", 0755);
+
+    KernelStats kernel_stats = create_kernel_stats();
 
     printf("=== Experimento: %d execucoes por kernel (%s) ===\n", num_runs, mode);
     for (int kernel_index = 0; kernel_index < 5; kernel_index++) {
@@ -66,15 +115,15 @@ int main(void) {
                 break;
             }
 
-            double elapsed = timer_stop(&timer);
+            kernel_stats.runs[run_index].time_elapsed = timer_stop(&timer);
             EnergySample energy_end = energy_read();
-            double energy = energy_delta_joules(&energy_begin, &energy_end);
-            double speedup = 1.0;
-            double efficiency = metrics_efficiency(speedup, 1);
-            double flops = metrics_flops(img.width, img.height, 3, kernel_size, elapsed);
-            double mflops = metrics_mflops(flops);
-            double avg_power = metrics_avg_power(energy, elapsed);
-            double mflops_per_watt = metrics_mflops_per_watt(mflops, avg_power);
+            kernel_stats.runs[run_index].energy_consumed = energy_delta_joules(&energy_begin, &energy_end);
+            kernel_stats.runs[run_index].speedup = 1.0;
+            kernel_stats.runs[run_index].efficiency = metrics_efficiency(kernel_stats.runs[run_index].speedup, 1);
+            kernel_stats.runs[run_index].flops = metrics_flops(img.width, img.height, 3, kernel_size, kernel_stats.runs[run_index].time_elapsed);
+            kernel_stats.runs[run_index].mflops = metrics_mflops(kernel_stats.runs[run_index].flops);
+            kernel_stats.runs[run_index].avg_power = metrics_avg_power(kernel_stats.runs[run_index].energy_consumed, kernel_stats.runs[run_index].time_elapsed);
+            kernel_stats.runs[run_index].mflops_per_watt = metrics_mflops_per_watt(kernel_stats.runs[run_index].mflops, kernel_stats.runs[run_index].avg_power);
 
             char output_path[256];
             snprintf(output_path, sizeof(output_path),
