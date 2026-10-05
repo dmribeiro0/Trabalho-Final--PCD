@@ -179,12 +179,18 @@ int main(void) {
     mkdir("outputs/sequential", 0755);
     mkdir("outputs/sequential/images", 0755);
     mkdir("outputs/sequential/csv", 0755);
+    mkdir("outputs/sequential/csv/runs", 0755);
+    mkdir("outputs/sequential/csv/averages", 0755);
     mkdir("outputs/openmp", 0755);
     mkdir("outputs/openmp/images", 0755);
     mkdir("outputs/openmp/csv", 0755);
+    mkdir("outputs/openmp/csv/runs", 0755);
+    mkdir("outputs/openmp/csv/averages", 0755);
     mkdir("outputs/pthread", 0755);
     mkdir("outputs/pthread/images", 0755);
     mkdir("outputs/pthread/csv", 0755);
+    mkdir("outputs/pthread/csv/runs", 0755);
+    mkdir("outputs/pthread/csv/averages", 0755);
 
 
     ModeStats mode_stats[3];
@@ -260,12 +266,12 @@ int main(void) {
 
             char stats_path[256];
             snprintf(stats_path, sizeof(stats_path),
-                     "outputs/%s/csv/%s_%s_stats.csv",
+                     "outputs/%s/csv/runs/%s_%s_stats.csv",
                      current_mode, kernel_names[kernel_index], current_mode);
             save_kernel_stats(stats_path, current_stats);
 
             snprintf(stats_path, sizeof(stats_path),
-                     "outputs/%s/csv/%s_%s_avg_stats.csv",
+                     "outputs/%s/csv/averages/%s_%s_avg_stats.csv",
                      current_mode, kernel_names[kernel_index], current_mode);
             save_average_stats(stats_path, current_stats);
         }
