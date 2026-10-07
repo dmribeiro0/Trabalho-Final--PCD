@@ -2,6 +2,7 @@
 # Experimento: Impacto da divisão de dados no desempenho de filtros convolucionais
 #
 #   make            build the 'convolve_seq' binary (default, sequential)
+#   make main       build and execute o main.c (sequential, OpenMP e pthread)
 #   make seq        build sequential version
 #   make omp        build OpenMP version
 #   make pthread    build Pthreads version
@@ -58,9 +59,13 @@ KERNELS = laplacian sobel_h sobel_v sharpen blur
 # Modos
 MODES = seq omp pthread cuda
 
-.PHONY: all seq omp pthread cuda clean test-all all_parallel runner cuda-runner cycle-test cycle-all
+.PHONY: all main seq omp pthread cuda clean test-all all_parallel runner cuda-runner cycle-test cycle-all
 
 all: seq
+
+# Compila e executa o programa principal, que percorre os três modos de CPU.
+main: omp
+	./$(BIN_OMP)
 
 # Binário sequencial
 $(BIN_SEQ): $(CORE_SRC) $(SRC_DIR)/core/main.c
